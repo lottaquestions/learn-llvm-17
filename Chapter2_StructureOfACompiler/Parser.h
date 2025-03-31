@@ -4,6 +4,7 @@
 #include "Lexer.h"
 // The coding guidelines from LLVM forbid the use of the <iostream> library, 
 // therefore, the header of the equivalent LLVM functionality is included
+// e.g. llvm::errs() is defined in this file
 #include "llvm/Support/raw_ostream.h"
 
 class Parser{

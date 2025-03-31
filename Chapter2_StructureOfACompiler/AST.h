@@ -8,6 +8,7 @@ class Factor;
 class BinaryOp;
 class WithDecl;
 class ASTVisitor{
+    public:
     virtual void visit(AST &){}
     virtual void visit(Expr &){}
     virtual void visit(Factor &) = 0;
@@ -53,6 +54,20 @@ class BinaryOp : public Expr{
     Expr *getLeft() const { return Left; }
     Expr *getRight() const { return Right; }
     Operator getOperator() const { return Op; }
+    virtual void accept(ASTVisitor &V) override {
+        V.visit(*this);
+    }
+};
+
+class WithDecl : public AST {
+    using VarVector = llvm::SmallVector<llvm::StringRef, 8>;
+    VarVector Vars;
+    Expr *E;
+    public:
+    WithDecl(VarVector Vars, Expr *E) : Vars(Vars), E(E) {}
+    VarVector::const_iterator begin() { return Vars.begin(); }
+    VarVector::const_iterator end() { return Vars.end(); }
+    Expr *getExpr() { return E; }
     virtual void accept(ASTVisitor &V) override {
         V.visit(*this);
     }
