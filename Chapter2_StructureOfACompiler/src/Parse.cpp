@@ -18,14 +18,14 @@ AST *Parser::parse(){
 // Implements 
 //    calc : ("with" ident ("," ident)* ":")? expr ;
 AST *Parser::parseCalc(){
-    Expr E;
+    Expr *E;
     llvm::SmallVector<llvm::StringRef, 8> Vars;
 
     // Conditional ("with" ident ("," ident)* ":")? 
     if (Tok.is(Token::KW_with)){
         advance();
 
-        if expect(Token::ident){
+        if (expect(Token::ident)){
             goto _error;
         }
         Vars.push_back(Tok.getText());
@@ -67,7 +67,7 @@ AST *Parser::parseCalc(){
 //   expr : term (( "+" | "-" ) term)* ;
 Expr *Parser::parseExpr(){
     Expr *Left = parseTerm();
-    while (Tok.isOenOf(Token::plus, Token::minus)){
+    while (Tok.isOneOf(Token::plus, Token::minus)){
         BinaryOp::Operator Op = Tok.is(Token::plus) ? BinaryOp::Plus : BinaryOp::Minus;
         advance();
         Expr *Right = parseTerm();
@@ -82,9 +82,9 @@ Expr *Parser::parseExpr(){
 Expr *Parser::parseTerm(){
     Expr *Left = parseFactor();
     while (Tok.isOneOf(Token::star, Token::slash)){
-        BinaryOperator Op = Token.is(Token::star) ? BinaryOp::Mul : BinaryOp::Div;
+        BinaryOp::Operator Op = Tok.is(Token::star) ? BinaryOp::Mul : BinaryOp::Div;
         advance();
-        Exp *Right = parseFactor();
+        Expr *Right = parseFactor();
         Left = new BinaryOp(Op, Left, Right);
     }
     return Left;
@@ -111,7 +111,7 @@ Expr *Parser::parseFactor(){
 
     default:
         if(!Res) error();
-        while(!Token.isOneOf(Token::r_paren, Token::star, Token::plus, Token::minus, Token::slash, Token::eoi))
+        while(!Tok.isOneOf(Token::r_paren, Token::star, Token::plus, Token::minus, Token::slash, Token::eoi))
             advance();
 
     }
