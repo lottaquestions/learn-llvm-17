@@ -32,7 +32,7 @@ namespace tinylang
 
     public:
         DiagnosticsEngine(SourceMgr &SrcMgr) : SrcMgr(SrcMgr), NumErrors(0) {}
-        unsigned numErrors() const, noexcept { return NumErrors; }
+        unsigned numErrors() const noexcept { return NumErrors; }
 
         template<typename... Args>
         void report(SMLoc Loc, unsigned DiagID, Args&&... Arguments){
