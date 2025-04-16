@@ -45,8 +45,8 @@ namespace tinylang{
         const DeclKind Kind;
         protected:
         Decl *EnclosingDecL;
-        SMLoc Loc;
-        StringRef Name;
+        SMLoc Loc; // Location of the name
+        StringRef Name; // Name of the declaration
 
         public:
         Decl(DeclKind Kind, Decl *EnclosingDecL, SMLoc Loc, StringRef Name)
