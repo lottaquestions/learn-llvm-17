@@ -1,6 +1,6 @@
 set(LLVM_LINK_COMPONENTS support)
 
-add_tinylang_library(tinylanglexer
+add_tinylang_library(tinylangLexer
 Lexer.cpp
 
 LINK_LIBS

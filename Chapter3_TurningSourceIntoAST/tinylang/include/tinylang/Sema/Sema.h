@@ -41,6 +41,34 @@ namespace tinylang{
         void actOnImport(StringRef ModuleName, IdentList &Ids);
         void actOnConstantDeclaration(DeclList &Decls, SMLoc Loc, StringRef Name, Expr *E);
         void actOnVariableDeclaration(DeclList &Decls, IdentList &Ids, Decl *D);
+        void actOnFormalParameterDeclaration(FormalParamList &Params, IdentList &Ids, Decl *D, bool IsVar);
+        ProcedureDeclaration *actOnProcedureDeclaration(SMLoc Loc, StringRef Name);
+        void actOnProcedureHeading(ProcedureDeclaration *ProcDecl, FormalParamList &Params, Decl *RetType);
+        void actOnProcedureDeclaration(ProcedureDeclaration *ProcDecl, SMLoc Loc, StringRef Name, DeclList &Decls, StmtList &Stmts);
+        void actOnAssignment(StmtList &Stmts, SMLoc Loc, Decl *D, Expr *E);
+        void actOnProcCall(StmtList &Stmts, SMLoc Loc, Decl *D, ExprList &Params);
+        void actOnIfStatment(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts);
+        void actOnWhileStatement(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &WhileStmts);
+        void actOnReturnStatement(StmtList &Stmts, SMLoc Loc, Expr *RetVal);
+
+        Expr *actOnExpression(Expr *Left, Expr *Right, const OperatorInfo &Op);
+        Expr *actOnSimpleExpression(Expr *Left, Expr *Right, const OperatorInfo &Op);
+        Expr *actOnTerm(Expr *Left, Expr *Right, const OperatorInfo &Op);
+        Expr *actOnPrefixExpression(Expr *E, const OperatorInfo &Op);
+        Expr *actOnIntegerLiteral(SMLoc Loc, StringRef Literal);
+        Expr *actOnVariable(Decl *D);
+        Expr *actOnFunctionCall(Decl *D, ExprList &Params);
+        Decl *actOnQualIdentPart(Decl *Prev, SMLoc Loc, StringRef Name);
+    };
+
+    class EnterDeclScope {
+        Sema &Semantics;
+
+        public:
+        EnterDeclScope(Sema &Semantics, Decl *D) : Semantics(Semantics) {
+            Semantics.enterScope(D);
+        }
+        ~EnterDeclScope() { Semantics.leaveScope(); }
     };
     
 } // namespace tinylang
