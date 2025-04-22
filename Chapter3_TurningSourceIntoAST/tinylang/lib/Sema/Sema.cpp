@@ -142,3 +142,146 @@ void Sema::actOnFormalParameterDeclaration(FormalParamList &Params, IdentList &I
         Diags.report(Loc, diag::err_vardecl_requires_type);
     }
 }
+
+ProcedureDeclaration *Sema::actOnProcedureDeclaration(SMLoc Loc, StringRef Name){
+    ProcedureDeclaration *P = new ProcedureDeclaration(CurrentDecl, Loc, Name);
+    // Procedure should be declared only once in the current scope
+    if (!CurrentScope->insert(P))
+        Diags.report(Loc, diag::err_symbold_declared, Name);
+    return P;
+}
+
+void Sema::actOnProcedureHeading(ProcedureDeclaration *ProcDecl, FormalParamList &Params, Decl *RetType){
+    ProcDecl->setFormalParams(Params);
+    auto *RetTypeDecl = dyn_cast_or_null<TypeDeclaration>(RetType);
+    // Return type of a procedure must be a type
+    if(!RetTypeDecl && RetType){
+        Diags.report(RetType->getLocation(), diag::err_returntype_must_be_type);
+    } else {
+        ProcDecl->setReturnType(RetTypeDecl);
+    }
+}
+
+void Sema::actOnProcedureDeclaration(ProcedureDeclaration *ProcDecl, SMLoc Loc, StringRef Name, DeclList &Decls, StmtList &Stmts){
+    if (Name != ProcDecl->getName()){
+        Diags.report(Loc, diag::err_proc_identifier_not_equal);
+        Diags.report(ProcDecl->getLocation(), diag::note_proc_identifier_declaration);
+    }
+    ProcDecl->setDecls(Decls);
+    ProcDecl->setStmts(Stmts);
+}
+
+void Sema::actOnAssignment(StmtList &Stmts, SMLoc Loc, Decl *D, Expr *E){
+    if (auto Var = dyn_cast<VariableDeclaration>(D)){
+        if(Var->getType() != E->getType()){
+            Diags.report(Loc, diag::err_types_for_operator_not_compatible, tok::getPunctuatorSpelling(tok::colonequal));
+        }
+        Stmts.push_back(new AssignmentStatement(Var, E));
+    } else if (D) {
+        // TODO: Emit error
+    }
+}
+
+void Sema::actOnProcCall(StmtList &Stmts, SMLoc Loc, Decl *D, ExprList &Params){
+    if (auto Proc = dyn_cast<ProcedureDeclaration>(D)){
+        checkFormalAndActualParameters(Loc, Proc->getFormalParams(), Params);
+        if (Proc->getReturnType()) {
+            Diags.report(Loc, diag::err_procedure_call_on_nonprocedure);
+        }
+        Stmts.push_back(new ProcedureCallStatement(Proc, Params));
+    } else if (D) {
+        Diags.report(Loc, diag::err_procedure_call_on_nonprocedure);
+    } 
+}
+
+void Sema::actOnIfStatment(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &IfStmts, StmtList &ElseStmts) {
+    if(!Cond) {
+        Cond = FalseLiteral;
+    }
+
+    if(Cond->getType() != BooleanType) {
+        Diags.report(Loc, diag::err_if_expr_must_be_bool);
+    }
+    Stmts.push_back(new IfStatement(Cond, IfStmts, ElseStmts));
+}
+
+
+void Sema::actOnWhileStatement(StmtList &Stmts, SMLoc Loc, Expr *Cond, StmtList &WhileStmts) {
+    if(!Cond) {
+        Cond = FalseLiteral;
+    }
+
+    if (Cond->getType() != BooleanType) {
+        Diags.report(Loc, diag::err_while_expr_must_be_bool);
+    }
+    Stmts.push_back(new WhileStatement(Cond, WhileStmts));
+}
+
+void Sema::actOnReturnStatement(StmtList &Stmts, SMLoc Loc, Expr *RetVal) {
+    auto *Proc = cast<ProcedureDeclaration>(CurrentDecl);
+    if(Proc->getReturnType() && !RetVal) {
+        Diags.report(Loc, diag::err_function_requires_return);
+    } else if (!Proc->getReturnType() && RetVal) {
+        Diags.report(Loc, diag::err_procedure_requires_empty_return);
+    } else if (Proc->getReturnType() && RetVal) {
+        if (Proc->getReturnType() != RetVal->getType()) {
+            Diags.report(Loc, diag::err_function_and_return_type);
+        }
+    }
+    Stmts.push_back(new ReturnStatement(RetVal));
+}
+
+Expr *Sema::actOnExpression(Expr *Left, Expr *Right, const OperatorInfo &Op) {
+    // Relation
+    if (!Left)
+        return Right;
+    if (!Right)
+        return Left;
+    
+    if (Left->getType() != Right->getType()) {
+        Diags.report(Op.getLocation(), diag::err_types_for_operator_not_compatible, tok::getPunctuatorSpelling(Op.getKind()));
+    }
+    bool IsConst = Left->isConst() && Right->isConst();
+    return new InfixExpression(Left, Right, Op, BooleanType, IsConst);
+}
+
+Expr *Sema::actOnSimpleExpression(Expr *Left, Expr *Right, const OperatorInfo &Op) {
+    // Addition
+    if (!Left)
+        return Right;
+    if (!Right)
+        return Left;
+
+    if (Left->getType() != Right->getType()) {
+        Diags.report(Op.getLocation(), diag::err_types_for_operator_not_compatible, tok::getPunctuatorSpelling(Op.getKind()));
+    }
+    
+    TypeDeclaration *Ty = Left->getType();
+    bool IsConst = Left->isConst() && Right->isConst();
+    if (IsConst && Op.getKind() == tok::kw_OR) {
+        BooleanLiteral *L = dyn_cast<BooleanLiteral>(Left);
+        BooleanLiteral *R = dyn_cast<BooleanLiteral>(Right);
+        return (L->getValue() || R->getValue()) ? TrueLiteral : FalseLiteral;
+    }
+    return new InfixExpression(Left, Right, Op, Ty, IsConst);
+}
+
+Expr *Sema::actOnTerm(Expr *Left, Expr *Right, const OperatorInfo &Op) {
+    // Multiplication
+    if (!Left)
+        return Right;
+    if (!Right)
+        return Left;
+
+    if (Left->getType() != Right->getType() || !isOperatorForType(Op.getKind(), Left->getType())){
+        Diags.report(Op.getLocation(), diag::err_types_for_operator_not_compatible, tok::getPunctuatorSpelling(Op.getKind()));
+    }
+    TypeDeclaration *Ty = Left->getType();
+    bool IsConst = Left->isConst() && Right->isConst();
+    if(IsConst && Op.getKind() == tok::kw_AND) {
+        BooleanLiteral *L = dyn_cast<BooleanLiteral>(Left);
+        BooleanLiteral *R = dyn_cast<BooleanLiteral>(Right);
+        return (L->getValue() && R->getValue()) ? TrueLiteral : FalseLiteral;
+    }
+    return new InfixExpression(Left, Right, Op, Ty, IsConst);
+}
