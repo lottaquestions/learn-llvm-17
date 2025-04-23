@@ -243,6 +243,8 @@ namespace tinylang{
         public:
         IntegerLiteral(SMLoc Loc, llvm::APSInt &Value, TypeDeclaration *Ty)
         : Expr(EK_Int, Ty, true), Loc(Loc), Value(Value) {}
+        IntegerLiteral(SMLoc Loc, llvm::APSInt &&Value, TypeDeclaration *Ty)
+        : Expr(EK_Int, Ty, true), Loc(Loc), Value(std::move(Value)) {}
         llvm::APSInt &getValue() noexcept { return Value; }
 
         static bool classof(const Expr *ExprToCheck){

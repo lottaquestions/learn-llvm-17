@@ -285,3 +285,110 @@ Expr *Sema::actOnTerm(Expr *Left, Expr *Right, const OperatorInfo &Op) {
     }
     return new InfixExpression(Left, Right, Op, Ty, IsConst);
 }
+
+Expr *Sema::actOnPrefixExpression(Expr *E, const OperatorInfo &Op) {
+    if (!E)
+        return nullptr;
+    if (!isOperatorForType(Op.getKind(), E->getType())){
+        Diags.report(Op.getLocation(), diag::err_types_for_operator_not_compatible, tok::getPunctuatorSpelling(Op.getKind()));
+    }
+
+    if (E->isConst() && Op.getKind() == tok::kw_NOT) {
+        BooleanLiteral *L = dyn_cast<BooleanLiteral>(E);
+        return L->getValue() ? FalseLiteral : TrueLiteral;
+    }
+
+    if (Op.getKind() == tok::minus) {
+        bool Ambiguous = true;
+        if (isa<IntegerLiteral>(E) || isa<VariableAcccess>(E) || isa<ConstantAccess>(E)) {
+            Ambiguous = false;
+        } else if ( auto *Infix = dyn_cast<InfixExpression>(E)) {
+            tok::TokenKind Kind = Infix->getOperatorInfo().getKind();
+            if (Kind == tok::star || Kind == tok::slash) {
+                Ambiguous = false;
+            }
+        }
+        if (Ambiguous) {
+            Diags.report(Op.getLocation(), diag::warn_ambigous_negation);
+        }
+    }
+    return new PrefixExpression(E, Op, E->getType(), E->isConst());
+}
+
+Expr *Sema::actOnIntegerLiteral(SMLoc Loc, StringRef Literal) {
+    uint8_t Radix = 10;
+    if(Literal.endswith("H")) {
+        Literal = Literal.drop_back();
+        Radix = 16;
+    }
+
+    /// Construct an Arbritray Precision Integer from a string representation.
+    ///
+    /// This constructor interprets the string \p str in the given radix. The
+    /// interpretation stops when the first character that is not suitable for the
+    /// radix is encountered, or the end of the string. Acceptable radix values
+    /// are 2, 8, 10, 16, and 36. It is an error for the value implied by the
+    /// string to require more bits than numBits.
+    ///
+    /// \param numBits the bit width of the constructed APInt
+    /// \param str the string to be interpreted
+    /// \param radix the radix to use for the conversion
+    /// APInt(unsigned numBits, StringRef str, uint8_t radix);
+    llvm::APInt Value(64,Literal, Radix);
+    return new IntegerLiteral(Loc, llvm::APSInt(Value, false), IntergerType); // APSInt - An arbitrary precision integer that knows its signedness.
+}
+
+Expr *Sema::actOnVariable(Decl *D) {
+    if (!D){
+        return nullptr;
+    }
+    if (auto *V = dyn_cast<VariableDeclaration>(D)){
+        return new VariableAcccess(V);
+    } else if (auto *P = dyn_cast<FormalParameterDeclaration>(D)) {
+        return new VariableAcccess(P);
+    } else if (auto *C = dyn_cast<ConstantDeclaration>(D)){
+        if ( C == TrueConst) {
+            return TrueLiteral;
+        }
+        if (C == FalseConst){
+            return FalseLiteral;
+        }
+        return new ConstantAccess(C);
+    }
+    return nullptr;
+}
+
+Expr *Sema::actOnFunctionCall(Decl *D, ExprList &Params){
+    if (!D) {
+        return nullptr;
+    }
+    if (auto *P = dyn_cast<ProcedureDeclaration>(D)) {
+        checkFormalAndActualParameters(D->getLocation(), P->getFormalParams(), Params);
+        if (!P->getReturnType()){
+            Diags.report(D->getLocation(), diag::err_function_call_on_nonfunction);
+        }
+        return new FunctionCallExpr(P, Params);
+    }
+    Diags.report(D->getLocation(), diag::err_function_call_on_nonfunction);
+    return nullptr;
+}
+
+Decl *Sema::actOnQualIdentPart(Decl *Prev, SMLoc Loc, StringRef Name) {
+    if(!Prev) {
+        if (Decl *D = CurrentScope->lookup(Name)) {
+            return D;
+        }
+    } else if (auto *Mod = dyn_cast<ModuleDeclaration>(Prev)) {
+        auto Decls = Mod->getDecls();
+        for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I ){
+            if ((*I)->getName() == Name){
+                return *I;
+            }
+        }
+    } else {
+        llvm_unreachable("actionQualIdentPart only callable "
+        "with module declarations");
+    }
+    Diags.report(Loc, diag::err_undeclared_name, Name);
+    return nullptr;
+}
