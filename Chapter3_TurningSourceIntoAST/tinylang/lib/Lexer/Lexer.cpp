@@ -49,7 +49,7 @@ namespace charinfo{
 void Lexer::next(Token &Result){
     // Skip whitespace
     while (*CurPtr && charinfo::isWhitespace(*CurPtr)){
-        ++CurPtr
+        ++CurPtr;
     }
 
     if(!*CurPtr){

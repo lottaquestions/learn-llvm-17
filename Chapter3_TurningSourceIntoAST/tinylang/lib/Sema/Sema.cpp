@@ -107,7 +107,7 @@ void Sema::actOnConstantDeclaration(DeclList &Decls, SMLoc Loc, StringRef Name, 
 
 void Sema::actOnVariableDeclaration(DeclList &Decls, IdentList &Ids, Decl *D){
     assert(CurrentScope && "CurrentScope not set");
-    // A type must be supplied for a variable
+    // A type must be supplied for a variable or list of variables
     if(TypeDeclaration *Ty = dyn_cast<TypeDeclaration>(D)){
         for(auto &[Loc, Name] : Ids){
             auto *Decl = new VariableDeclaration(CurrentDecl, Loc, Name, Ty);
@@ -119,6 +119,7 @@ void Sema::actOnVariableDeclaration(DeclList &Decls, IdentList &Ids, Decl *D){
             }
         }
     } else if (!Ids.empty()) {
+        // A list of variable declarations was provided without a type
         SMLoc Loc = Ids.front().first;
         Diags.report(Loc, diag::err_vardecl_requires_type);
     }

@@ -18,7 +18,7 @@ namespace tinylang{
         public:
         void addKeywords();
 
-        tok::TokenKind getKeyword(StringRef Name, tok::TokenKind DefaultTokenCode == tok::unknown){
+        tok::TokenKind getKeyword(StringRef Name, tok::TokenKind DefaultTokenCode = tok::unknown){
             if (auto Result = HashTable.find(Name) ; Result != HashTable.end()){
                 return Result->second;
             }
@@ -61,7 +61,7 @@ namespace tinylang{
         private:
         void identifier(Token &Result);
         void number (Token &Result);
-        void string (Toekn &Result);
+        void string (Token &Result);
         void comment();
 
         SMLoc getLoc() { return SMLoc::getFromPointer(CurPtr); }

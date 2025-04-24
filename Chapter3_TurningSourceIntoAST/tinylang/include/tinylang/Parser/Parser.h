@@ -15,7 +15,7 @@ namespace tinylang {
     private:
         Lexer &Lex;
 
-        Sema &Action;
+        Sema &Actions;
 
         Token Tok;
 
@@ -62,13 +62,38 @@ namespace tinylang {
             }
             return true; // unreachable
         }
+
+        bool parseCompilationUnit(ModuleDeclaration *&D);
+        bool parseImport();
+        bool parseBlock(DeclList &Decls, StmtList &Stmts);
+        bool parseDeclaration(DeclList &Decls);
+        bool parseConstantDeclaration(DeclList &Decls);
+        bool parseVariableDeclaration(DeclList &Decls);
+        bool parseProcedureDeclaration(DeclList &ParentDecls);
+        bool parseFormalParameters(FormalParamList &Params, Decl *&RetType);
+        bool parseFormalParameterList(FormalParamList &Params);
+        bool parseFormalParameter(FormalParamList &Params);
+        bool parseStatementSequence(StmtList &Stmts);
+        bool parseStatement(StmtList &Stmts);
+        bool parseIfStatement(StmtList &Stmts);
+        bool parseWhileStatement(StmtList &Stmts);
+        bool parseReturnStatement(StmtList &Stmts);
+        bool parseExpList(ExprList &Exprs);
+        bool parseExpression (Expr *&E);
+        bool parseRelation(OperatorInfo &Op);
+        bool parseSimpleExpression(Expr *&E);
+        bool parseAddOperator(OperatorInfo &Op);
+        bool parseTerm(Expr *&E);
+        bool parseMulOperator(OperatorInfo &Op);
+        bool parseFactor(Expr *&E);
+        bool parseQualident(Decl *&D);
+        bool parseIdentList(IdentList &Ids);
+
     public:
-        Parser(Lexer &Lex, Sema &Action);
+        Parser(Lexer &Lex, Sema &Actions);
         
         ModuleDeclaration *parse();
-        // TODO: Incomplete. Finish up the rest of the definitions
     };
-    
     
 } // namespace tinylang
 
