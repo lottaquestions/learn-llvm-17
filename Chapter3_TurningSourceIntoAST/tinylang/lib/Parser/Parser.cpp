@@ -266,3 +266,376 @@ bool Parser::parseFormalParameterList(FormalParamList &Params) {
     }
     return false;
 }
+
+bool Parser::parseFormalParameter(FormalParamList &Params) {
+    auto _errorhandler = [this]{
+        return skipUntil(tok::r_paren, tok::semi);
+    };
+    IdentList Ids;
+    Decl *D;
+    bool IsVar = false;
+    if(Tok.is(tok::kw_VAR)) {
+        IsVar = true;
+        advance();
+    }
+    if (parseIdentList(Ids)){
+        return _errorhandler();
+    }
+    if (consume(tok::colon)){
+        return _errorhandler();
+    }
+    if (parseQualident(D)) {
+        return _errorhandler();
+    }
+    Actions.actOnFormalParameterDeclaration(Params, Ids, D, IsVar);
+    return false;
+}
+
+bool Parser::parseStatementSequence(StmtList &Stmts) {
+    auto _errorhandler = [this]{
+        return skipUntil(tok::kw_ELSE, tok::kw_END);
+    };
+    if (parseStatement(Stmts)) {
+        return _errorhandler();
+    }
+    while (Tok.is(tok::semi)) {
+        advance();
+        if (parseStatement(Stmts)) {
+            return _errorhandler();
+        }
+    }
+    return false;
+}
+
+bool Parser::parseStatement(StmtList &Stmts) {
+    auto _errorhandler = [this]{
+        return skipUntil(tok::semi, tok::kw_ELSE, tok::kw_END);
+    };
+    if (Tok.is(tok::identifier)){
+        Decl *D;
+        Expr *E = nullptr;
+        SMLoc Loc = Tok.getLocation();
+        if (parseQualident(D)) {
+            return _errorhandler();
+        }
+        if (Tok.is(tok::colonequal)) {
+            advance();
+            if (parseExpression(E)) {
+                return _errorhandler();
+            }
+            Actions.actOnAssignment(Stmts, Loc, D, E);
+        } else if (Tok.is(tok::l_paren)) {
+            ExprList Exprs;
+            advance();
+            if (Tok.isOneOf(tok::l_paren, tok::plus, tok::minus, tok::kw_NOT, tok::identifier, tok::integer_literal)) {
+                if (parseExpList(Exprs)) {
+                    return _errorhandler();
+                }
+            }
+            Actions.actOnProcCall(Stmts, Loc, D, Exprs);
+        }
+    } else if (Tok.is(tok::kw_IF)) {
+        if (parseIfStatement(Stmts)) {
+            return _errorhandler();
+        }
+    } else if (Tok.is(tok::kw_WHILE)) {
+        if (parseWhileStatement(Stmts)) {
+            return _errorhandler();
+        }
+    } else if (Tok.is(tok::kw_RETURN)) {
+        if (parseReturnStatement(Stmts)) {
+            return _errorhandler();
+        }
+    } else {
+        // ERROR
+        return _errorhandler();
+    }
+    return false;
+}
+
+bool Parser::parseIfStatement(StmtList &Stmts) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::semi, tok::kw_ELSE, tok::kw_END);
+    };
+    Expr *E = nullptr;
+    StmtList IfStmts, ElseStmts;
+    SMLoc Loc = Tok.getLocation();
+    if (consume(tok::kw_IF)) {
+        return _errorhandler();
+    }
+    if (parseExpression(E)) {
+        return _errorhandler();
+    }
+    if (consume(tok::kw_THEN)) {
+        return _errorhandler();
+    }
+    if (parseStatementSequence(IfStmts)){
+        return _errorhandler();
+    }
+    if (Tok.is(tok::kw_ELSE)) {
+        advance();
+        if (parseStatementSequence(ElseStmts)) {
+            return _errorhandler();
+        }
+    }
+    if (expect(tok::kw_END)) {
+        return _errorhandler();
+    }
+    Actions.actOnIfStatment(Stmts, Loc, E, IfStmts, ElseStmts);
+    advance();
+    return false;
+}
+
+bool Parser::parseWhileStatement(StmtList &Stmts) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::semi, tok::kw_ELSE, tok::kw_END);
+    };
+    Expr *E = nullptr;
+    StmtList WhileStmts;
+    SMLoc Loc = Tok.getLocation();
+    if (consume(tok::kw_WHILE)) {
+        return _errorhandler();
+    }
+    if (parseExpression(E)) {
+        return _errorhandler();
+    }
+    if (consume(tok::kw_DO)) {
+        return _errorhandler();
+    }
+    if(parseStatementSequence(WhileStmts)) {
+        return _errorhandler();
+    }
+    if (expect(tok::kw_END)) {
+        return _errorhandler();
+    }
+    Actions.actOnWhileStatement(Stmts, Loc, E, WhileStmts);
+    advance();
+    return false;
+}
+
+bool Parser::parseReturnStatement(StmtList &Stmts) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::semi, tok::kw_ELSE, tok::kw_END);
+    };
+    Expr *E = nullptr;
+    SMLoc Loc = Tok.getLocation();
+    if (consume(tok::kw_RETURN)) {
+        return _errorhandler();
+    }
+    if(Tok.isOneOf(tok::l_paren, tok::plus, tok::minus, tok::kw_NOT, tok::identifier, tok::integer_literal)) {
+        if (parseExpression(E)) {
+            return _errorhandler();
+        }
+    }
+    Actions.actOnReturnStatement(Stmts, Loc, E);
+    return false;
+}
+
+bool Parser::parseExpList(ExprList &Exprs) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::r_paren);
+    };
+    Expr *E = nullptr;
+    if (parseExpression(E)) {
+        return _errorhandler();
+    }
+    if (E) {
+        Exprs.push_back(E);
+    }
+    while (Tok.is(tok::comma)) {
+        E = nullptr;
+        advance();
+        if (parseExpression(E)) {
+            return _errorhandler();
+        }
+        if (E) {
+            Exprs.push_back(E);
+        }
+    }
+    return false;
+}
+
+bool Parser::parseExpression( Expr *&E) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::r_paren, tok::comma, tok::semi, tok::kw_DO, tok::kw_ELSE, tok::kw_END, tok::kw_THEN);
+    };
+    if (parseSimpleExpression(E)) {
+        return _errorhandler();
+    }
+    if (Tok.isOneOf(tok::hash, tok::less, tok::lessequal, tok::equal, tok::greater, tok::greaterequal)) {
+        OperatorInfo Op;
+        Expr *Right = nullptr;
+        if (parseRelation(Op)) {
+            return _errorhandler();
+        }
+        if (parseSimpleExpression(Right)) {
+            return _errorhandler();
+        }
+        E = Actions.actOnExpression(E, Right, Op);
+    }
+    return false;
+}
+
+bool Parser::parseRelation(OperatorInfo &Op) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::l_paren, tok::plus, tok::minus, tok::kw_NOT, tok::identifier, tok::integer_literal);
+    };
+    if (Tok.is(tok::equal)) {
+        Op = fromTok(Tok);
+        advance();
+    } else if (Tok.is(tok::hash)) {
+        Op = fromTok(Tok);
+        advance();
+    } else if (Tok.is(tok::less)) {
+        Op = fromTok(Tok);
+        advance();
+    } else if (Tok.is(tok::lessequal)) {
+        Op = fromTok(Tok);
+        advance();
+    } else if (Tok.is(tok::greater)) {
+        Op = fromTok(Tok);
+        advance();
+    } else if (Tok.is(tok::greaterequal)) {
+        Op = fromTok(Tok);
+        advance();
+    } else {
+        // ERROR
+        return _errorhandler();
+    }
+    return false;
+}
+
+bool Parser::parseSimpleExpression(Expr *&E) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::hash, tok::r_paren, tok::comma, tok::semi, tok::less,
+                         tok::lessequal, tok::equal, tok::greater, tok::greaterequal, tok::kw_DO,
+                         tok::kw_ELSE, tok::kw_END, tok::kw_THEN);
+    };
+    OperatorInfo PrefixOp;
+    if (Tok.isOneOf(tok::plus, tok::minus)) {
+        PrefixOp = fromTok(Tok);
+        advance();
+    }
+    if (parseTerm(E )) {
+        return _errorhandler();
+    }
+    while (Tok.isOneOf(tok::plus, tok::minus, tok::kw_OR)) {
+        OperatorInfo Op;
+        Expr *Right = nullptr;
+        if (parseAddOperator(Op)) {
+            return _errorhandler();
+        }
+        if (parseTerm(Right)) {
+            return _errorhandler();
+        }
+        E = Actions.actOnSimpleExpression(E, Right, Op);
+    }
+    if (!PrefixOp.isUnspecified()) {
+        return Actions.actOnPrefixExpression(E, PrefixOp);
+    }
+    return false;
+}
+
+bool Parser::parseAddOperator(OperatorInfo &Op) {
+    auto _errorhandler = [this]{
+        return skipUntil(tok::l_paren, tok::kw_NOT, tok::identifier, tok::integer_literal);
+    };
+    if (Tok.isOneOf(tok::plus, tok::minus, tok::kw_OR)) {
+        Op = fromTok(Tok);
+        advance();
+    } else {
+        // ERROR
+        return _errorhandler();
+    }
+    return false;
+}
+
+bool Parser::parseTerm(Expr *&E) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::hash, tok::r_paren, tok::comma, tok::semi, tok::less, 
+            tok::lessequal, tok::equal, tok::greater, tok::greaterequal, tok::kw_DO, 
+            tok::kw_ELSE, tok::kw_END, tok::kw_THEN);
+    };
+    if (parseFactor(E)) {
+        return _errorhandler();
+    }
+    while (Tok.isOneOf(tok::star, tok::slash, tok::kw_AND, tok::kw_DIV, tok::kw_MOD)) {
+        OperatorInfo Op;
+        Expr *Right = nullptr;
+        if (parseMulOperator(Op)) {
+            return _errorhandler();
+        }
+        if (parseFactor(E)) {
+            return _errorhandler();
+        }
+        E = Actions.actOnTerm(E, Right, Op);
+    }
+    return false;
+}
+
+bool Parser::parseMulOperator(OperatorInfo &Op) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::l_paren, tok::kw_NOT, tok::identifier, tok::integer_literal);
+    };
+    if (Tok.isOneOf(tok::star, tok::slash, tok::kw_DIV, tok::kw_MOD, tok::kw_AND)) {
+        Op = fromTok(Tok);
+        advance();
+    } else {
+        // ERROR
+        return _errorhandler();
+    }
+    return false;
+}
+
+bool Parser::parseFactor(Expr *&E) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::hash, tok::r_paren, tok::star,
+                         tok::plus, tok::comma, tok::minus,
+                         tok::slash, tok::semi, tok::less,
+                         tok::lessequal, tok::equal, tok::greater,
+                         tok::greaterequal, tok::kw_AND, tok::kw_DIV,
+                         tok::kw_DO, tok::kw_ELSE, tok::kw_END,
+                         tok::kw_MOD, tok::kw_OR, tok::kw_THEN);
+    };
+    if (Tok.is(tok::integer_literal)) {
+        E = Actions.actOnIntegerLiteral(Tok.getLocation(), Tok.getLiteralData());
+        advance();
+    } else if (Tok.is(tok::identifier)) {
+        Decl *D;
+        ExprList Exprs;
+        if (parseQualident(D)) {
+            return _errorhandler();
+        }
+        if (Tok.is(tok::l_paren)) {
+            advance();
+            if (Tok.isOneOf(tok::l_paren, tok::plus, tok::minus, tok::kw_NOT, tok::identifier, tok::integer_literal)) {
+                if (parseExpList(Exprs)) {
+                    return _errorhandler();
+                } 
+            }
+            if(expect(tok::r_paren)) {
+                return _errorhandler();
+            }
+            E = Actions.actOnFunctionCall(D, Exprs);
+            advance();
+        }
+        else if (Tok.isOneOf(tok::hash, tok::r_paren, tok::star,
+                             tok::plus, tok::comma, tok::minus,
+                             tok::slash, tok::semi, tok::less,
+                             tok::lessequal, tok::equal, tok::greater,
+                             tok::greaterequal, tok::kw_AND,
+                             tok::kw_DIV, tok::kw_DO, tok::kw_ELSE,
+                             tok::kw_END, tok::kw_MOD, tok::kw_OR,
+                             tok::kw_THEN)) {
+            E = Actions.actOnVariable(D);
+        }
+    } else if (Tok.is(tok::l_paren)) {
+        advance();
+        if (parseExpression(E)) {
+            return _errorhandler();
+        }
+        if (consume(tok::r_paren)) {
+            return _errorhandler();
+        }
+    }
+}
