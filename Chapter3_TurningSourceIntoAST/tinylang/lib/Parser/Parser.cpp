@@ -637,5 +637,64 @@ bool Parser::parseFactor(Expr *&E) {
         if (consume(tok::r_paren)) {
             return _errorhandler();
         }
+    } else if (Tok.is(tok::kw_NOT)) {
+        OperatorInfo Op = fromTok(Tok);
+        advance();
+        if (parseFactor(E)) {
+            return _errorhandler();
+        }
+        E = Actions.actOnPrefixExpression(E, Op);
+    } else {
+        return _errorhandler();
     }
+    return false;
 }
+
+bool Parser::parseQualident(Decl *&D) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::hash, tok::l_paren, tok::r_paren,
+                         tok::star, tok::plus, tok::comma,
+                         tok::minus, tok::slash, tok::colonequal,
+                         tok::semi, tok::less, tok::lessequal,
+                         tok::equal, tok::greater, tok::greaterequal,
+                         tok::kw_AND, tok::kw_DIV, tok::kw_DO,
+                         tok::kw_ELSE, tok::kw_END, tok::kw_MOD,
+                         tok::kw_OR, tok::kw_THEN);
+    };
+    D = nullptr;
+    if (expect(tok::identifier)) {
+        return _errorhandler();
+    }
+    D = Actions.actOnQualIdentPart(D, Tok.getLocation(), Tok.getIdentifier());
+    advance(); // Move to the next token, could potentially be a dot (.)
+    while (Tok.is(tok::period) && isa<ModuleDeclaration>(D)) {
+        advance(); // Move to the identifier token after a dot.
+        if (expect(tok::identifier)) {
+            return _errorhandler();
+        }
+        D = Actions.actOnQualIdentPart(D, Tok.getLocation(), Tok.getName());
+        advance(); // Move to the next token, could potentially be a dot (.)
+    }
+    return false;
+}
+
+bool Parser::parseIdentList(IdentList &Ids) {
+    auto _errorhandler = [this] {
+        return skipUntil(tok::colon, tok::semi);
+    };
+    if (expect(tok::identifier)) {
+        return _errorhandler();
+    }
+    Ids.push_back(std::pair<SMLoc, StringRef>(Tok.getLocation(), Tok.getIdentifier()));
+    advance();
+    while (Tok.is(tok::comma)) {
+        advance(); // Move to the identifier token after a comma.
+        if (expect(tok::identifier)) {
+            return _errorhandler();
+        }
+        Ids.push_back(std::pair<SMLoc, StringRef>(Tok.getLocation(), Tok.getIdentifier()));
+        advance(); // Move to the next token, could potentially be a comma (,)
+    }
+    return false;
+}
+
