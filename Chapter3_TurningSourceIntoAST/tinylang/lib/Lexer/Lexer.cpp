@@ -8,7 +8,7 @@ void KeywordFilter::addKeyword(StringRef Keyword, tok::TokenKind TokenCode){
 
 void KeywordFilter::addKeywords(){
     #define KEYWORD(NAME, FLAGS)
-    addKeyword(StringRef(#NAME, tok::kw_##NAME))
+    addKeyword(StringRef(#NAME), tok::kw_##NAME);
     #include "tinylang/Basic/TokenKinds.def"
 }
 
