@@ -7,7 +7,7 @@ void KeywordFilter::addKeyword(StringRef Keyword, tok::TokenKind TokenCode){
 }
 
 void KeywordFilter::addKeywords(){
-    #define KEYWORD(NAME, FLAGS)
+    #define KEYWORD(NAME, FLAGS) \
     addKeyword(StringRef(#NAME), tok::kw_##NAME);
     #include "tinylang/Basic/TokenKinds.def"
 }
@@ -196,7 +196,7 @@ void Lexer::comment(){
     CurPtr = End;
 }
 
-void Lexer::formToken(Token &Result, cont char *TokEnd, tok::TokenKind Kind){
+void Lexer::formToken(Token &Result, const char *TokEnd, tok::TokenKind Kind){
     size_t TokLen = TokEnd - CurPtr;
     Result.Ptr = CurPtr;
     Result.Length = TokLen;

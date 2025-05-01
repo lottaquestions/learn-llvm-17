@@ -26,7 +26,7 @@ namespace tinylang{
         public:
         Ident(SMLoc Loc, const StringRef &Name) : Loc(Loc), Name(Name) {}
         SMLoc getLocation() const noexcept { return Loc; }
-        const StringRef &Name() { return Name; }
+        const StringRef &getName() { return Name; }
     };
 
     using IdentList = std::vector<std::pair<SMLoc, StringRef>>;

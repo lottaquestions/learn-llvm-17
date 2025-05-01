@@ -51,7 +51,7 @@ namespace tinylang {
         template<typename... Tokens>
         bool skipUntil(Tokens&&... Toks){
             while (true) {
-                if (... || Tok.is(Toks)) {
+                if ((... || Tok.is(Toks))) {
                     return false;
                 }
 

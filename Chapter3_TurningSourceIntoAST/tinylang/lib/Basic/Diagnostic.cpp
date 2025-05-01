@@ -11,12 +11,12 @@ namespace {
         #define DIAG(ID, Level, Msg) SourceMgr::DK_##Level, /* return the level enum from LLVM*/
         #include "tinylang/Basic/Diagnostic.def"
     };
-
-    const char *DiagnosticsEngine::getDiagnosticText(unsigned DiagID){
-        return DiagnosticText[DiagID];
-    }
-
-    SourceMgr::DiagKind DiagnosticsEngine::getDiagnosticKind(unsigned DiagID){
-        return DiagnosticKind[DiagID];
-    }
 } // namespace 
+
+const char *DiagnosticsEngine::getDiagnosticText(unsigned DiagID){
+    return DiagnosticText[DiagID];
+}
+
+SourceMgr::DiagKind DiagnosticsEngine::getDiagnosticKind(unsigned DiagID){
+    return DiagnosticKind[DiagID];
+}
